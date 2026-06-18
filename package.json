@@ -8,6 +8,7 @@
     "dev:convex": "convex dev",
     "dev:all": "convex dev & vite",
     "build": "tsc -b && vite build",
+    "vercel-build": "bunx convex deploy --cmd-url-env-var-name VITE_CONVEX_URL --cmd 'bun run build'",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
