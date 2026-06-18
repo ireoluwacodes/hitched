@@ -131,4 +131,7 @@
   html {
     @apply font-sans;
     }
+  html.font-scaled {
+    font-size: calc(100% * var(--font-scale, 1));
+    }
 }

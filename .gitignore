@@ -1,3 +1,18 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+build
+out
+
+# Environment & secrets (keep .env.example committed)
+.env
+.env.local
+.env.*.local
+!.env.example
+
 # Logs
 logs
 *.log
@@ -5,20 +20,55 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+bun-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# TypeScript
+*.tsbuildinfo
 
-# Editor directories and files
+# Vite
+vite.config.ts.timestamp-*
+
+# Test / coverage
+coverage
+.nyc_output
+
+# Convex local tooling
+.convex
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editors & IDEs
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Cursor / agent tooling (local skill installs)
+.cursor/
+skills-lock.json
+
+# Deploy / hosting
+.vercel
+.netlify
+.wrangler
+
+# Certificates & keys
+*.pem
+*.key
+
+# Misc
+*.local
