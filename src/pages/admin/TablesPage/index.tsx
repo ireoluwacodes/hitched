@@ -1,9 +1,9 @@
 import { useState } from "react"
 import { useMutation, useQuery } from "convex/react"
-import { QRCodeSVG } from "qrcode.react"
+import { BrandedQrCode } from "@/components/BrandedQrCode"
 import { api } from "@convex-api/_generated/api"
 import { getAdminSession } from "@/lib/adminSession"
-import { buildTableUrl, getAppOrigin } from "@/lib/qrUrl"
+import { buildTableUrl } from "@/lib/qrUrl"
 import { QrPdfExport } from "@/components/admin/QrPdfExport"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -105,11 +105,6 @@ export function TablesPage() {
 
       {tables && tables.length > 0 && (
         <>
-          <p className="text-sm text-muted-foreground">
-            QR codes open{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{getAppOrigin()}</code>
-            {" "}— phone must be on the same Wi‑Fi.
-          </p>
           <div className="flex items-center justify-between">
             <h2 className="font-heading text-lg font-medium">Preview</h2>
             <QrPdfExport tables={tables} />
@@ -120,7 +115,7 @@ export function TablesPage() {
                 key={table._id}
                 className="flex flex-col items-center gap-2 rounded-lg border border-border p-4"
               >
-                <QRCodeSVG value={buildTableUrl(table.qrToken)} size={160} />
+                <BrandedQrCode value={buildTableUrl(table.qrToken)} size={160} />
                 <p className="font-heading text-sm font-medium">
                   {table.label ?? `Table ${table.number}`}
                 </p>

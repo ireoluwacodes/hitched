@@ -13,15 +13,19 @@ export interface IMenuCategorySection {
   items: IMenuItemOption[]
 }
 
+export type TSelectedItemsByCategory = Partial<
+  Record<Id<"menuCategories">, Id<"menuItems">>
+>
+
 export interface IOrderFormProps {
   guestName: string
   tableNumber: number
-  selectedId: Id<"menuItems"> | null
+  selectedIds: TSelectedItemsByCategory
   categories: IMenuCategorySection[]
   isSubmitting: boolean
   canSubmit: boolean
   submitLabel?: string
   onGuestNameChange: (name: string) => void
-  onSelectItem: (itemId: Id<"menuItems">) => void
+  onSelectItem: (categoryId: Id<"menuCategories">, itemId: Id<"menuItems">) => void
   onSubmit: () => void
 }

@@ -5,10 +5,12 @@ import { api } from "@convex-api/_generated/api"
 import type { Id } from "@convex-api/_generated/dataModel"
 import { Skeleton } from "@/components/ui/skeleton"
 import { OrderForm } from "@/components/guest/OrderForm"
+import type { TSelectedItemsByCategory } from "@/components/guest/OrderForm/@types"
 import { OrderStatusCard } from "@/components/guest/OrderStatusCard"
 import { GuestIntroSplash } from "@/components/guest/GuestIntroSplash"
 import { addStoredOrder, getStoredOrders } from "@/lib/guestStorage"
 import { hasSeenIntro, markIntroSeen } from "@/lib/guestIntro"
+import { resolveProductName } from "@/lib/branding"
 import { toast } from "sonner"
 
 export function TableOrderPage() {
@@ -18,7 +20,7 @@ export function TableOrderPage() {
   const submitOrder = useMutation(api.orders.submit)
 
   const [guestName, setGuestName] = useState("")
-  const [selectedId, setSelectedId] = useState<Id<"menuItems"> | null>(null)
+  const [selectedIds, setSelectedIds] = useState<TSelectedItemsByCategory>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [storageVersion, setStorageVersion] = useState(0)
   const [showIntro, setShowIntro] = useState(() => !hasSeenIntro(qrToken))
@@ -41,18 +43,26 @@ export function TableOrderPage() {
     setShowIntro(false)
   }
 
+  function handleSelectItem(categoryId: Id<"menuCategories">, itemId: Id<"menuItems">) {
+    setSelectedIds((prev) => ({ ...prev, [categoryId]: itemId }))
+  }
+
+  const selectedItemIds = Object.values(selectedIds).filter(
+    (id): id is Id<"menuItems"> => id !== undefined
+  )
+
   async function handleSubmit() {
-    if (!tableData?.table || !selectedId) return
+    if (!tableData?.table || selectedItemIds.length === 0) return
     setIsSubmitting(true)
     try {
       const { orderId, guestEditToken } = await submitOrder({
         tableId: tableData.table._id,
         guestName,
-        itemIds: [selectedId],
+        itemIds: selectedItemIds,
       })
       addStoredOrder(qrToken, { orderId, guestEditToken, createdAt: Date.now() })
       setStorageVersion((v) => v + 1)
-      setSelectedId(null)
+      setSelectedIds({})
       toast.success("Order submitted!")
       document.getElementById("your-orders")?.scrollIntoView({ behavior: "smooth" })
     } catch (err) {
@@ -60,6 +70,16 @@ export function TableOrderPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (showIntro) {
+    return (
+      <GuestIntroSplash
+        productName={resolveProductName(tableData?.productName)}
+        eventName={tableData?.eventName}
+        onComplete={handleIntroComplete}
+      />
+    )
   }
 
   if (tableData === undefined || menu === undefined) {
@@ -100,65 +120,55 @@ export function TableOrderPage() {
     )
   }
 
-  const canSubmit = guestName.trim().length > 0 && selectedId !== null
+  const canSubmit = guestName.trim().length > 0 && selectedItemIds.length > 0
 
   return (
-    <>
-      {showIntro && (
-        <GuestIntroSplash
-          productName={tableData.productName}
-          eventName={tableData.eventName}
-          onComplete={handleIntroComplete}
-        />
-      )}
-
-      <div className="mx-auto max-w-lg p-6">
-        <header className="mb-6">
-          {tableData.eventName && (
-            <p className="mb-1 text-xs tracking-wide text-muted-foreground uppercase">
-              {tableData.eventName}
-            </p>
-          )}
-          <h1 className="font-heading text-2xl font-medium">Place your order</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Pick one item, submit, then order again anytime.
+    <div className="mx-auto max-w-lg p-6">
+      <header className="mb-6">
+        {tableData.eventName && (
+          <p className="mb-1 text-xs tracking-wide text-muted-foreground uppercase">
+            {tableData.eventName}
           </p>
-        </header>
+        )}
+        <h1 className="font-heading text-2xl font-medium">Place your order</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Pick one item per category, submit, then order again anytime.
+        </p>
+      </header>
 
-        <section id="your-orders" className="mb-8 flex flex-col gap-4">
-          <h2 className="font-heading text-lg font-medium">Your orders</h2>
-          {!myOrders || myOrders.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Orders you place from this device will appear here.
-            </p>
-          ) : (
-            myOrders.map((order) => (
-              <OrderStatusCard
-                key={order._id}
-                orderId={order._id}
-                qrToken={qrToken}
-                guestName={order.guestName}
-                itemNamesSnapshot={order.itemNamesSnapshot}
-                status={order.status}
-                createdAt={order.createdAt}
-                onDeleted={() => setStorageVersion((v) => v + 1)}
-              />
-            ))
-          )}
-        </section>
+      <section id="your-orders" className="mb-8 flex flex-col gap-4">
+        <h2 className="font-heading text-lg font-medium">Your orders</h2>
+        {!myOrders || myOrders.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Orders you place from this device will appear here.
+          </p>
+        ) : (
+          myOrders.map((order) => (
+            <OrderStatusCard
+              key={order._id}
+              orderId={order._id}
+              qrToken={qrToken}
+              guestName={order.guestName}
+              itemNamesSnapshot={order.itemNamesSnapshot}
+              status={order.status}
+              createdAt={order.createdAt}
+              onDeleted={() => setStorageVersion((v) => v + 1)}
+            />
+          ))
+        )}
+      </section>
 
-        <OrderForm
-          guestName={guestName}
-          tableNumber={tableData.table.number}
-          selectedId={selectedId}
-          categories={menu}
-          isSubmitting={isSubmitting}
-          canSubmit={canSubmit}
-          onGuestNameChange={setGuestName}
-          onSelectItem={setSelectedId}
-          onSubmit={handleSubmit}
-        />
-      </div>
-    </>
+      <OrderForm
+        guestName={guestName}
+        tableNumber={tableData.table.number}
+        selectedIds={selectedIds}
+        categories={menu}
+        isSubmitting={isSubmitting}
+        canSubmit={canSubmit}
+        onGuestNameChange={setGuestName}
+        onSelectItem={handleSelectItem}
+        onSubmit={handleSubmit}
+      />
+    </div>
   )
 }

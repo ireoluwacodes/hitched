@@ -5,6 +5,7 @@ import { api } from "@convex-api/_generated/api"
 import type { Id } from "@convex-api/_generated/dataModel"
 import { Skeleton } from "@/components/ui/skeleton"
 import { OrderForm } from "@/components/guest/OrderForm"
+import type { TSelectedItemsByCategory } from "@/components/guest/OrderForm/@types"
 import { getStoredOrderToken } from "@/lib/guestStorage"
 import { toast } from "sonner"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -12,6 +13,22 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { statusConfig, type TOrderStatus } from "@/lib/statusConfig"
 import { formatOrderItems } from "@/lib/format"
+
+function buildSelectedIdsFromOrder(
+  itemIds: Id<"menuItems">[],
+  categories: { _id: Id<"menuCategories">; items: { _id: Id<"menuItems"> }[] }[]
+): TSelectedItemsByCategory {
+  const selected: TSelectedItemsByCategory = {}
+  for (const itemId of itemIds) {
+    for (const category of categories) {
+      if (category.items.some((item) => item._id === itemId)) {
+        selected[category._id] = itemId
+        break
+      }
+    }
+  }
+  return selected
+}
 
 export function EditOrderPage() {
   const { qrToken = "", orderId = "" } = useParams()
@@ -26,27 +43,35 @@ export function EditOrderPage() {
   const editOrder = useMutation(api.orders.edit)
 
   const [guestName, setGuestName] = useState("")
-  const [selectedId, setSelectedId] = useState<Id<"menuItems"> | null>(null)
+  const [selectedIds, setSelectedIds] = useState<TSelectedItemsByCategory>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [initialized, setInitialized] = useState(false)
 
   useEffect(() => {
-    if (order && !initialized) {
+    if (order && menu && !initialized) {
       setGuestName(order.guestName)
-      setSelectedId(order.itemIds[0] ?? null)
+      setSelectedIds(buildSelectedIdsFromOrder(order.itemIds, menu))
       setInitialized(true)
     }
-  }, [order, initialized])
+  }, [order, menu, initialized])
+
+  function handleSelectItem(categoryId: Id<"menuCategories">, itemId: Id<"menuItems">) {
+    setSelectedIds((prev) => ({ ...prev, [categoryId]: itemId }))
+  }
+
+  const selectedItemIds = Object.values(selectedIds).filter(
+    (id): id is Id<"menuItems"> => id !== undefined
+  )
 
   async function handleSubmit() {
-    if (!guestEditToken || !selectedId) return
+    if (!guestEditToken || selectedItemIds.length === 0) return
     setIsSubmitting(true)
     try {
       await editOrder({
         orderId: orderId as Id<"orders">,
         guestEditToken,
         guestName,
-        itemIds: [selectedId],
+        itemIds: selectedItemIds,
       })
       toast.success("Order updated!")
     } catch (err) {
@@ -102,7 +127,7 @@ export function EditOrderPage() {
     )
   }
 
-  const canSubmit = guestName.trim().length > 0 && selectedId !== null
+  const canSubmit = guestName.trim().length > 0 && selectedItemIds.length > 0
 
   return (
     <div className="mx-auto max-w-lg p-6">
@@ -113,13 +138,13 @@ export function EditOrderPage() {
       <OrderForm
         guestName={guestName}
         tableNumber={order.tableNumber}
-        selectedId={selectedId}
+        selectedIds={selectedIds}
         categories={menu}
         isSubmitting={isSubmitting}
         canSubmit={canSubmit}
         submitLabel="Update Order"
         onGuestNameChange={setGuestName}
-        onSelectItem={setSelectedId}
+        onSelectItem={handleSelectItem}
         onSubmit={handleSubmit}
       />
     </div>
