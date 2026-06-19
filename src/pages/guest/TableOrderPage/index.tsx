@@ -8,34 +8,32 @@ import { OrderForm } from "@/components/guest/OrderForm"
 import type { TSelectedItemsByCategory } from "@/components/guest/OrderForm/@types"
 import { OrderStatusCard } from "@/components/guest/OrderStatusCard"
 import { GuestIntroSplash } from "@/components/guest/GuestIntroSplash"
-import { addStoredOrder, getStoredOrders } from "@/lib/guestStorage"
+import { addStoredOrder } from "@/lib/guestStorage"
+import { getOrCreateDeviceId } from "@/lib/guestDevice"
 import { hasSeenIntro, markIntroSeen } from "@/lib/guestIntro"
+import { hasSelectedItems, selectedIdsToArray } from "@/lib/orderSelection"
 import { resolveProductName } from "@/lib/branding"
 import { toast } from "sonner"
 
 export function TableOrderPage() {
   const { qrToken = "" } = useParams()
+  const deviceId = useMemo(() => getOrCreateDeviceId(), [])
   const tableData = useQuery(api.tables.getByToken, { qrToken })
   const menu = useQuery(api.menu.getActiveMenu)
   const submitOrder = useMutation(api.orders.submit)
 
   const [guestName, setGuestName] = useState("")
+  const [hasChild, setHasChild] = useState(false)
   const [selectedIds, setSelectedIds] = useState<TSelectedItemsByCategory>({})
+  const [childSelectedIds, setChildSelectedIds] = useState<TSelectedItemsByCategory>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [storageVersion, setStorageVersion] = useState(0)
   const [showIntro, setShowIntro] = useState(() => !hasSeenIntro(qrToken))
 
-  const storedTokens = useMemo(() => {
-    void storageVersion
-    return getStoredOrders(qrToken).map((o) => ({
-      orderId: o.orderId,
-      guestEditToken: o.guestEditToken,
-    }))
-  }, [qrToken, storageVersion])
-
-  const myOrders = useQuery(
-    api.orders.listByGuestTokens,
-    storedTokens.length > 0 ? { tokens: storedTokens } : "skip"
+  const existingOrder = useQuery(
+    api.orders.getByDevice,
+    tableData?.table
+      ? { tableId: tableData.table._id, deviceId }
+      : "skip"
   )
 
   function handleIntroComplete() {
@@ -47,24 +45,35 @@ export function TableOrderPage() {
     setSelectedIds((prev) => ({ ...prev, [categoryId]: itemId }))
   }
 
-  const selectedItemIds = Object.values(selectedIds).filter(
-    (id): id is Id<"menuItems"> => id !== undefined
-  )
+  function handleSelectChildItem(categoryId: Id<"menuCategories">, itemId: Id<"menuItems">) {
+    setChildSelectedIds((prev) => ({ ...prev, [categoryId]: itemId }))
+  }
+
+  const selectedItemIds = selectedIdsToArray(selectedIds)
+  const childItemIds = selectedIdsToArray(childSelectedIds)
 
   async function handleSubmit() {
-    if (!tableData?.table || selectedItemIds.length === 0) return
+    if (!tableData?.table || !menu) return
+    if (!hasSelectedItems(selectedIds)) {
+      toast.error("Select at least one item")
+      return
+    }
+    if (hasChild && !hasSelectedItems(childSelectedIds)) {
+      toast.error("Select at least one item for your child's order")
+      return
+    }
+
     setIsSubmitting(true)
     try {
       const { orderId, guestEditToken } = await submitOrder({
         tableId: tableData.table._id,
         guestName,
         itemIds: selectedItemIds,
+        childItemIds: hasChild ? childItemIds : [],
+        guestDeviceId: deviceId,
       })
       addStoredOrder(qrToken, { orderId, guestEditToken, createdAt: Date.now() })
-      setStorageVersion((v) => v + 1)
-      setSelectedIds({})
       toast.success("Order submitted!")
-      document.getElementById("your-orders")?.scrollIntoView({ behavior: "smooth" })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to submit order")
     } finally {
@@ -120,7 +129,10 @@ export function TableOrderPage() {
     )
   }
 
-  const canSubmit = guestName.trim().length > 0 && selectedItemIds.length > 0
+  const canSubmit =
+    guestName.trim().length > 0 &&
+    hasSelectedItems(selectedIds) &&
+    (!hasChild || hasSelectedItems(childSelectedIds))
 
   return (
     <div className="mx-auto max-w-lg p-6">
@@ -130,45 +142,46 @@ export function TableOrderPage() {
             {tableData.eventName}
           </p>
         )}
-        <h1 className="font-heading text-2xl font-medium">Place your order</h1>
+        <h1 className="font-heading text-2xl font-medium">
+          {existingOrder ? "Your order" : "Place your order"}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pick one item per category, submit, then order again anytime.
+          {existingOrder
+            ? "One order per device. You can edit while it's still pending."
+            : "Choose what you'd like from the menu. Optionally add an order for your child."}
         </p>
       </header>
 
-      <section id="your-orders" className="mb-8 flex flex-col gap-4">
-        <h2 className="font-heading text-lg font-medium">Your orders</h2>
-        {!myOrders || myOrders.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Orders you place from this device will appear here.
-          </p>
-        ) : (
-          myOrders.map((order) => (
-            <OrderStatusCard
-              key={order._id}
-              orderId={order._id}
-              qrToken={qrToken}
-              guestName={order.guestName}
-              itemNamesSnapshot={order.itemNamesSnapshot}
-              status={order.status}
-              createdAt={order.createdAt}
-              onDeleted={() => setStorageVersion((v) => v + 1)}
-            />
-          ))
-        )}
-      </section>
-
-      <OrderForm
-        guestName={guestName}
-        tableNumber={tableData.table.number}
-        selectedIds={selectedIds}
-        categories={menu}
-        isSubmitting={isSubmitting}
-        canSubmit={canSubmit}
-        onGuestNameChange={setGuestName}
-        onSelectItem={handleSelectItem}
-        onSubmit={handleSubmit}
-      />
+      {existingOrder ? (
+        <OrderStatusCard
+          orderId={existingOrder._id}
+          qrToken={qrToken}
+          guestName={existingOrder.guestName}
+          itemNamesSnapshot={existingOrder.itemNamesSnapshot}
+          childItemNamesSnapshot={existingOrder.childItemNamesSnapshot}
+          status={existingOrder.status}
+          createdAt={existingOrder.createdAt}
+        />
+      ) : (
+        <OrderForm
+          guestName={guestName}
+          tableNumber={tableData.table.number}
+          selectedIds={selectedIds}
+          childSelectedIds={childSelectedIds}
+          categories={menu}
+          isSubmitting={isSubmitting}
+          canSubmit={canSubmit}
+          hasChild={hasChild}
+          onGuestNameChange={setGuestName}
+          onHasChildChange={(value) => {
+            setHasChild(value)
+            if (!value) setChildSelectedIds({})
+          }}
+          onSelectItem={handleSelectItem}
+          onSelectChildItem={handleSelectChildItem}
+          onSubmit={handleSubmit}
+        />
+      )}
     </div>
   )
 }

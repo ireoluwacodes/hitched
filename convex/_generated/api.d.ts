@@ -15,6 +15,7 @@ import type * as lib_crypto from "../lib/crypto.js";
 import type * as lib_settings from "../lib/settings.js";
 import type * as menu from "../menu.js";
 import type * as menuMutations from "../menuMutations.js";
+import type * as migrate from "../migrate.js";
 import type * as orders from "../orders.js";
 import type * as seed from "../seed.js";
 import type * as tables from "../tables.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   "lib/settings": typeof lib_settings;
   menu: typeof menu;
   menuMutations: typeof menuMutations;
+  migrate: typeof migrate;
   orders: typeof orders;
   seed: typeof seed;
   tables: typeof tables;

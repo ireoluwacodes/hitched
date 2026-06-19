@@ -1,13 +1,16 @@
 import type { Id } from "@convex-api/_generated/dataModel"
 import type { TOrderStatus } from "@/lib/statusConfig"
 
-export interface IOrderStatusCardProps {
-  orderId: Id<"orders">
-  qrToken: string
+export interface IServerOrderSummary {
+  _id: Id<"orders">
+  tableNumber: number
   guestName: string
   itemNamesSnapshot: string[]
-  childItemNamesSnapshot?: string[]
   status: TOrderStatus
+  isForKid?: boolean
   createdAt: number
-  onDeleted?: () => void
+}
+
+export interface IServerOrdersPanelProps {
+  orders: IServerOrderSummary[]
 }

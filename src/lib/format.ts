@@ -6,5 +6,16 @@ export function formatOrderTime(timestamp: number): string {
 }
 
 export function formatOrderItems(items: string[]): string {
-  return items.join(" + ")
+  return items.join(", ")
+}
+
+export function formatGuestOrder(
+  itemNames: string[],
+  childItemNames?: string[]
+): string {
+  if (!childItemNames || childItemNames.length === 0) {
+    return formatOrderItems(itemNames)
+  }
+
+  return `Guest: ${formatOrderItems(itemNames)}\nChild: ${formatOrderItems(childItemNames)}`
 }

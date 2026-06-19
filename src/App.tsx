@@ -3,6 +3,7 @@ import { useBootstrapEvent } from "@/hooks/useBootstrapEvent"
 import { AppMeta } from "@/components/AppMeta"
 import { GuestLayout } from "@/components/layout/GuestLayout"
 import { AdminLayout, AdminGuard } from "@/components/layout/AdminLayout"
+import { ServerLayout, ServerGuard } from "@/components/layout/ServerLayout"
 import { LandingPage } from "@/pages/LandingPage"
 import { TableOrderPage } from "@/pages/guest/TableOrderPage"
 import { EditOrderPage } from "@/pages/guest/EditOrderPage"
@@ -11,6 +12,8 @@ import { DashboardPage } from "@/pages/admin/DashboardPage"
 import { MenuPage } from "@/pages/admin/MenuPage"
 import { TablesPage } from "@/pages/admin/TablesPage"
 import { SettingsPage } from "@/pages/admin/SettingsPage"
+import { ServerPinGatePage } from "@/pages/server/ServerPinGatePage"
+import { ServerOrderPage } from "@/pages/server/ServerOrderPage"
 
 export function App() {
   useBootstrapEvent()
@@ -19,26 +22,34 @@ export function App() {
     <>
       <AppMeta />
       <Routes>
-      <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<LandingPage />} />
 
-      <Route element={<GuestLayout />}>
-        <Route path="/t/:qrToken" element={<TableOrderPage />} />
-        <Route path="/t/:qrToken/order/:orderId" element={<EditOrderPage />} />
-      </Route>
-
-      <Route path="/admin" element={<PinGatePage />} />
-
-      <Route element={<AdminGuard />}>
-        <Route element={<AdminLayout />}>
-          <Route path="/admin/dashboard" element={<DashboardPage />} />
-          <Route path="/admin/menu" element={<MenuPage />} />
-          <Route path="/admin/tables" element={<TablesPage />} />
-          <Route path="/admin/settings" element={<SettingsPage />} />
+        <Route element={<GuestLayout />}>
+          <Route path="/t/:qrToken" element={<TableOrderPage />} />
+          <Route path="/t/:qrToken/order/:orderId" element={<EditOrderPage />} />
         </Route>
-      </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="/admin" element={<PinGatePage />} />
+
+        <Route element={<AdminGuard />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/dashboard" element={<DashboardPage />} />
+            <Route path="/admin/menu" element={<MenuPage />} />
+            <Route path="/admin/tables" element={<TablesPage />} />
+            <Route path="/admin/settings" element={<SettingsPage />} />
+          </Route>
+        </Route>
+
+        <Route path="/server" element={<ServerPinGatePage />} />
+
+        <Route element={<ServerGuard />}>
+          <Route element={<ServerLayout />}>
+            <Route path="/server/order" element={<ServerOrderPage />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </>
   )
 }

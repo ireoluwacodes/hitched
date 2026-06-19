@@ -1,15 +1,23 @@
 import { useState } from "react"
 import { useQuery } from "convex/react"
 import { api } from "@convex-api/_generated/api"
-import { getAdminSession } from "@/lib/adminSession"
+import { getAdminSession, getAdminRole } from "@/lib/adminSession"
+import { canAccessDashboard, canListTablesForFilter } from "@/lib/adminAccess"
 import { OrderTable } from "@/components/admin/OrderTable"
 import type { TOrderStatus } from "@/lib/statusConfig"
 import type { Id } from "@convex-api/_generated/dataModel"
 
 export function DashboardPage() {
   const sessionToken = getAdminSession() ?? ""
-  const orders = useQuery(api.orders.listLive, { sessionToken })
-  const tables = useQuery(api.tables.list, { sessionToken })
+  const role = getAdminRole()
+  const orders = useQuery(
+    api.orders.listLive,
+    canAccessDashboard(role) && sessionToken ? { sessionToken } : "skip"
+  )
+  const tables = useQuery(
+    api.tables.list,
+    canListTablesForFilter(role) && sessionToken ? { sessionToken } : "skip"
+  )
   const [tableFilter, setTableFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
 

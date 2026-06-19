@@ -7,16 +7,46 @@ import {
   Settings01Icon,
 } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
+import { getAdminRole } from "@/lib/adminSession"
 import type { THugeicon } from "@/lib/statusConfig"
+import type { TAdminRole } from "@/lib/adminRoles"
 
-const navItems: Array<{ to: string; label: string; icon: THugeicon }> = [
-  { to: "/admin/dashboard", label: "Orders", icon: DashboardSquare01Icon },
-  { to: "/admin/menu", label: "Menu", icon: SpoonAndForkIcon },
-  { to: "/admin/tables", label: "QR", icon: QrCodeIcon },
-  { to: "/admin/settings", label: "Settings", icon: Settings01Icon },
+const allNavItems: Array<{
+  to: string
+  label: string
+  icon: THugeicon
+  roles: TAdminRole[]
+}> = [
+  {
+    to: "/admin/dashboard",
+    label: "Orders",
+    icon: DashboardSquare01Icon,
+    roles: ["super_admin", "staff"],
+  },
+  {
+    to: "/admin/menu",
+    label: "Menu",
+    icon: SpoonAndForkIcon,
+    roles: ["super_admin", "staff"],
+  },
+  {
+    to: "/admin/tables",
+    label: "QR",
+    icon: QrCodeIcon,
+    roles: ["super_admin"],
+  },
+  {
+    to: "/admin/settings",
+    label: "Settings",
+    icon: Settings01Icon,
+    roles: ["super_admin"],
+  },
 ]
 
 export function AdminMobileNav() {
+  const role = getAdminRole()
+  const navItems = allNavItems.filter((item) => role && item.roles.includes(role))
+
   return (
     <nav className="flex border-b border-border bg-card/80 lg:hidden">
       {navItems.map(({ to, label, icon }) => (

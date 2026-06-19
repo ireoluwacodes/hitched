@@ -1,6 +1,6 @@
 import { mutation } from "./_generated/server"
 import { v } from "convex/values"
-import { requireAdminSession } from "./lib/auth"
+import { requireRole } from "./lib/auth"
 
 export const upsertCategory = mutation({
   args: {
@@ -10,7 +10,7 @@ export const upsertCategory = mutation({
     sortOrder: v.number(),
   },
   handler: async (ctx, { sessionToken, categoryId, name, sortOrder }) => {
-    await requireAdminSession(ctx, sessionToken)
+    await requireRole(ctx, sessionToken, ["super_admin", "staff"])
 
     if (categoryId) {
       await ctx.db.patch(categoryId, { name, sortOrder })
@@ -27,7 +27,7 @@ export const deleteCategory = mutation({
     categoryId: v.id("menuCategories"),
   },
   handler: async (ctx, { sessionToken, categoryId }) => {
-    await requireAdminSession(ctx, sessionToken)
+    await requireRole(ctx, sessionToken, ["super_admin", "staff"])
 
     const items = await ctx.db
       .query("menuItems")
@@ -56,7 +56,7 @@ export const upsertItem = mutation({
     ctx,
     { sessionToken, itemId, categoryId, name, description, sortOrder, isAvailable }
   ) => {
-    await requireAdminSession(ctx, sessionToken)
+    await requireRole(ctx, sessionToken, ["super_admin", "staff"])
 
     if (itemId) {
       await ctx.db.patch(itemId, {
@@ -85,7 +85,7 @@ export const deleteItem = mutation({
     itemId: v.id("menuItems"),
   },
   handler: async (ctx, { sessionToken, itemId }) => {
-    await requireAdminSession(ctx, sessionToken)
+    await requireRole(ctx, sessionToken, ["super_admin", "staff"])
     await ctx.db.delete(itemId)
   },
 })
@@ -97,7 +97,7 @@ export const toggleAvailability = mutation({
     isAvailable: v.boolean(),
   },
   handler: async (ctx, { sessionToken, itemId, isAvailable }) => {
-    await requireAdminSession(ctx, sessionToken)
+    await requireRole(ctx, sessionToken, ["super_admin", "staff"])
     await ctx.db.patch(itemId, { isAvailable })
   },
 })

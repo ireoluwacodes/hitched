@@ -26,7 +26,7 @@ bunx convex dev
 
 This creates `.env.local` with `VITE_CONVEX_URL` if it doesn't exist.
 
-On first load, the app auto-seeds sample data (dev PIN: `1234`, 10 tables, Nigerian wedding menu).
+On first load, the app auto-seeds sample data (dev PINs below, 10 tables, Nigerian wedding menu).
 
 To manually re-seed:
 
@@ -51,11 +51,13 @@ Open [http://localhost:5173](http://localhost:5173).
 | `/` | Landing page |
 | `/t/:qrToken` | Guest order page (scan QR) |
 | `/t/:qrToken/order/:orderId` | Edit a pending order |
-| `/admin` | Staff PIN gate |
-| `/admin/dashboard` | Live kitchen order display |
-| `/admin/menu` | Menu management |
+| `/admin` | Back-office PIN gate (super admin or staff) |
+| `/admin/dashboard` | Live kitchen order display (super admin) |
+| `/admin/menu` | Menu management (super admin) |
 | `/admin/tables` | Table count + QR PDF export |
-| `/admin/settings` | Event name, ordering toggle, PIN |
+| `/admin/settings` | Event name, ordering toggle, PINs |
+| `/server` | Server PIN gate (order-taking for guests without phones) |
+| `/server/order` | Server order station |
 
 ## Deploy (Vercel + Convex)
 
@@ -86,7 +88,7 @@ After the first deploy, seed production data and change the admin PIN:
 bunx convex run seed:default --prod
 ```
 
-Then open `/admin/settings` and change PIN from `1234`. Re-download table QR PDFs from `/admin/tables`.
+Then open `/admin/settings` and change PINs from defaults. Re-download table QR PDFs from `/admin/tables`.
 
 ### 4. Preview deployments (optional)
 
@@ -105,9 +107,15 @@ VITE_APP_URL=http://192.168.1.124:5173
 
 ## Default dev credentials
 
-- Admin PIN: `1234`
+| Role | PIN | Access |
+|------|-----|--------|
+| Super admin | `1234` | Dashboard, menu, tables, settings |
+| Staff | `5678` | Dashboard and menu |
+| Server | `9999` | `/server` order station |
+
 - Tables: 1–10 (each with unique QR token)
 - View QR codes at `/admin/tables` after logging in
+- Order statuses: Pending → Preparing → Ready for pickup → Served
 
 ## Scripts
 

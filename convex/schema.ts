@@ -4,7 +4,16 @@ import { v } from "convex/values"
 export const orderStatus = v.union(
   v.literal("pending"),
   v.literal("preparing"),
+  v.literal("ready_for_pickup"),
   v.literal("served")
+)
+
+export const orderSource = v.union(v.literal("guest"), v.literal("server"))
+
+export const adminRole = v.union(
+  v.literal("super_admin"),
+  v.literal("staff"),
+  v.literal("server")
 )
 
 export default defineSchema({
@@ -36,17 +45,28 @@ export default defineSchema({
     itemIds: v.array(v.id("menuItems")),
     itemNamesSnapshot: v.array(v.string()),
     status: orderStatus,
-    guestEditToken: v.string(),
+    guestEditToken: v.optional(v.string()),
+    guestDeviceId: v.optional(v.string()),
+    orderSource: v.optional(orderSource),
+    childItemIds: v.optional(v.array(v.id("menuItems"))),
+    childItemNamesSnapshot: v.optional(v.array(v.string())),
+    isForKid: v.optional(v.boolean()),
+    serverDeviceId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_status", ["status"])
     .index("by_table", ["tableId"])
-    .index("by_createdAt", ["createdAt"]),
+    .index("by_createdAt", ["createdAt"])
+    .index("by_table_device", ["tableId", "guestDeviceId"])
+    .index("by_server_device", ["serverDeviceId"]),
 
   eventSettings: defineTable({
-    pinHash: v.string(),
     pinSalt: v.string(),
+    superAdminPinHash: v.optional(v.string()),
+    staffPinHash: v.optional(v.string()),
+    serverPinHash: v.optional(v.string()),
+    pinHash: v.optional(v.string()),
     eventName: v.optional(v.string()),
     productName: v.optional(v.string()),
     orderingOpen: v.boolean(),
@@ -54,6 +74,7 @@ export default defineSchema({
 
   adminSessions: defineTable({
     token: v.string(),
+    role: v.optional(adminRole),
     expiresAt: v.number(),
   }).index("by_token", ["token"]),
 })

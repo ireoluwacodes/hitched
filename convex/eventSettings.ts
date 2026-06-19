@@ -1,9 +1,23 @@
 import { query, mutation } from "./_generated/server"
 import { v } from "convex/values"
-import { getSessionExpiry, requireAdminSession } from "./lib/auth"
+import { adminRole } from "./schema"
+import { getSessionExpiry, requireRole } from "./lib/auth"
 import { generateSalt, generateToken, hashPin } from "./lib/crypto"
 import { getEventSettings } from "./lib/settings"
 import { resolveProductName } from "./lib/branding"
+
+async function createSession(
+  ctx: { db: { insert: (table: "adminSessions", doc: { token: string; role: "super_admin" | "staff" | "server"; expiresAt: number }) => Promise<unknown> } },
+  role: "super_admin" | "staff" | "server"
+) {
+  const sessionToken = generateToken()
+  await ctx.db.insert("adminSessions", {
+    token: sessionToken,
+    role,
+    expiresAt: getSessionExpiry(),
+  })
+  return { sessionToken, role }
+}
 
 export const getPublic = query({
   args: {},
@@ -21,57 +35,93 @@ export const getPublic = query({
 export const getAdmin = query({
   args: { sessionToken: v.string() },
   handler: async (ctx, { sessionToken }) => {
-    await requireAdminSession(ctx, sessionToken)
+    const session = await requireRole(ctx, sessionToken, ["super_admin"])
     const settings = await getEventSettings(ctx)
     if (!settings) return null
     return {
       orderingOpen: settings.orderingOpen,
       eventName: settings.eventName,
       productName: resolveProductName(settings.productName),
+      role: session.role,
     }
   },
 })
 
-export const verifyPin = mutation({
+export const verifyAdminPin = mutation({
   args: { pin: v.string() },
   handler: async (ctx, { pin }) => {
     const settings = await getEventSettings(ctx)
     if (!settings) {
-      throw new Error("Event not initialized")
+      return { success: false as const, reason: "not_initialized" as const }
+    }
+
+    if (!settings.staffPinHash || !settings.serverPinHash) {
+      return { success: false as const, reason: "needs_migration" as const }
     }
 
     const pinHash = await hashPin(pin, settings.pinSalt)
-    if (pinHash !== settings.pinHash) {
-      throw new Error("Invalid PIN")
+    const superAdminPinHash = settings.superAdminPinHash ?? settings.pinHash
+
+    if (superAdminPinHash && pinHash === superAdminPinHash) {
+      const session = await createSession(ctx, "super_admin")
+      return { success: true as const, ...session }
+    }
+    if (settings.staffPinHash && pinHash === settings.staffPinHash) {
+      const session = await createSession(ctx, "staff")
+      return { success: true as const, ...session }
     }
 
-    const sessionToken = generateToken()
-    await ctx.db.insert("adminSessions", {
-      token: sessionToken,
-      expiresAt: getSessionExpiry(),
-    })
+    return { success: false as const, reason: "invalid_pin" as const }
+  },
+})
 
-    return { sessionToken }
+export const verifyServerPin = mutation({
+  args: { pin: v.string() },
+  handler: async (ctx, { pin }) => {
+    const settings = await getEventSettings(ctx)
+    if (!settings) {
+      return { success: false as const, reason: "not_initialized" as const }
+    }
+
+    if (!settings.serverPinHash) {
+      return { success: false as const, reason: "needs_migration" as const }
+    }
+
+    const pinHash = await hashPin(pin, settings.pinSalt)
+    if (pinHash !== settings.serverPinHash) {
+      return { success: false as const, reason: "invalid_pin" as const }
+    }
+
+    const session = await createSession(ctx, "server")
+    return { success: true as const, ...session }
   },
 })
 
 export const initEvent = mutation({
   args: {
-    pin: v.string(),
+    superAdminPin: v.string(),
+    staffPin: v.string(),
+    serverPin: v.string(),
     eventName: v.optional(v.string()),
   },
-  handler: async (ctx, { pin, eventName }) => {
+  handler: async (ctx, { superAdminPin, staffPin, serverPin, eventName }) => {
     const existing = await getEventSettings(ctx)
     if (existing) {
       throw new Error("Event already initialized")
     }
 
     const pinSalt = generateSalt()
-    const pinHash = await hashPin(pin, pinSalt)
+    const [superAdminPinHash, staffPinHash, serverPinHash] = await Promise.all([
+      hashPin(superAdminPin, pinSalt),
+      hashPin(staffPin, pinSalt),
+      hashPin(serverPin, pinSalt),
+    ])
 
     await ctx.db.insert("eventSettings", {
-      pinHash,
       pinSalt,
+      superAdminPinHash,
+      staffPinHash,
+      serverPinHash,
       eventName,
       orderingOpen: true,
     })
@@ -80,22 +130,28 @@ export const initEvent = mutation({
   },
 })
 
-export const setPin = mutation({
+export const setRolePin = mutation({
   args: {
     sessionToken: v.string(),
+    role: adminRole,
     newPin: v.string(),
   },
-  handler: async (ctx, { sessionToken, newPin }) => {
-    await requireAdminSession(ctx, sessionToken)
+  handler: async (ctx, { sessionToken, role, newPin }) => {
+    await requireRole(ctx, sessionToken, ["super_admin"])
     const settings = await getEventSettings(ctx)
     if (!settings) {
       throw new Error("Event not initialized")
     }
 
-    const pinSalt = generateSalt()
-    const pinHash = await hashPin(newPin, pinSalt)
+    const pinHash = await hashPin(newPin, settings.pinSalt)
+    const field =
+      role === "super_admin"
+        ? "superAdminPinHash"
+        : role === "staff"
+          ? "staffPinHash"
+          : "serverPinHash"
 
-    await ctx.db.patch(settings._id, { pinHash, pinSalt })
+    await ctx.db.patch(settings._id, { [field]: pinHash })
   },
 })
 
@@ -107,7 +163,7 @@ export const updateSettings = mutation({
     orderingOpen: v.optional(v.boolean()),
   },
   handler: async (ctx, { sessionToken, eventName, productName, orderingOpen }) => {
-    await requireAdminSession(ctx, sessionToken)
+    await requireRole(ctx, sessionToken, ["super_admin"])
     const settings = await getEventSettings(ctx)
     if (!settings) {
       throw new Error("Event not initialized")

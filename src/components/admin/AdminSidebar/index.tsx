@@ -10,24 +10,52 @@ import {
 } from "@hugeicons/core-free-icons"
 import { api } from "@convex-api/_generated/api"
 import { cn } from "@/lib/utils"
-import { clearAdminSession } from "@/lib/adminSession"
+import { clearAdminSession, getAdminRole } from "@/lib/adminSession"
 import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { resolveProductName } from "@/lib/branding"
 import { AppLogo } from "@/components/AppLogo"
 import type { THugeicon } from "@/lib/statusConfig"
+import type { TAdminRole } from "@/lib/adminRoles"
 
-const navItems: Array<{ to: string; label: string; icon: THugeicon }> = [
-  { to: "/admin/dashboard", label: "Dashboard", icon: DashboardSquare01Icon },
-  { to: "/admin/menu", label: "Menu", icon: SpoonAndForkIcon },
-  { to: "/admin/tables", label: "Tables & QR", icon: QrCodeIcon },
-  { to: "/admin/settings", label: "Settings", icon: Settings01Icon },
+const allNavItems: Array<{
+  to: string
+  label: string
+  icon: THugeicon
+  roles: TAdminRole[]
+}> = [
+  {
+    to: "/admin/dashboard",
+    label: "Dashboard",
+    icon: DashboardSquare01Icon,
+    roles: ["super_admin", "staff"],
+  },
+  {
+    to: "/admin/menu",
+    label: "Menu",
+    icon: SpoonAndForkIcon,
+    roles: ["super_admin", "staff"],
+  },
+  {
+    to: "/admin/tables",
+    label: "Tables & QR",
+    icon: QrCodeIcon,
+    roles: ["super_admin"],
+  },
+  {
+    to: "/admin/settings",
+    label: "Settings",
+    icon: Settings01Icon,
+    roles: ["super_admin"],
+  },
 ]
 
 export function AdminSidebar() {
   const navigate = useNavigate()
+  const role = getAdminRole()
   const settings = useQuery(api.eventSettings.getPublic)
   const productName = resolveProductName(settings?.productName)
+  const navItems = allNavItems.filter((item) => role && item.roles.includes(role))
 
   function handleLogout() {
     clearAdminSession()

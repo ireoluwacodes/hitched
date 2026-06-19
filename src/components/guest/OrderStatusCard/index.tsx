@@ -4,7 +4,6 @@ import { useMutation } from "convex/react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Delete02Icon } from "@hugeicons/core-free-icons"
 import { api } from "@convex-api/_generated/api"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -17,8 +16,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { statusConfig } from "@/lib/statusConfig"
-import { formatOrderItems, formatOrderTime } from "@/lib/format"
+import { statusConfig, GUEST_STATUS_HINTS } from "@/lib/statusConfig"
+import { formatGuestOrder, formatOrderTime } from "@/lib/format"
+import { OrderItemsDisplay } from "@/components/OrderItemsDisplay"
+import { StatusBadge } from "@/components/StatusBadge"
+import { cn } from "@/lib/utils"
 import { getStoredOrderToken, removeStoredOrder } from "@/lib/guestStorage"
 import { toast } from "sonner"
 import type { IOrderStatusCardProps } from "./@types"
@@ -28,6 +30,7 @@ export function OrderStatusCard({
   qrToken,
   guestName,
   itemNamesSnapshot,
+  childItemNamesSnapshot,
   status,
   createdAt,
   onDeleted,
@@ -57,20 +60,26 @@ export function OrderStatusCard({
   }
 
   return (
-    <article className="rounded-lg border border-border p-4">
+    <article
+      className={cn(
+        "rounded-lg border border-l-4 p-4",
+        config.surfaceClassName
+      )}
+    >
       <div className="mb-2 flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium">{guestName}</p>
           <p className="text-xs text-muted-foreground">{formatOrderTime(createdAt)}</p>
         </div>
-        <Badge className={config.className}>
-          <HugeiconsIcon icon={config.icon} strokeWidth={2} className="size-3" />
-          {config.label}
-        </Badge>
+        <StatusBadge status={status} />
       </div>
-      <p className="mb-3 text-sm text-muted-foreground">
-        {formatOrderItems(itemNamesSnapshot)}
-      </p>
+      <div className="mb-3">
+        <OrderItemsDisplay
+          itemNames={itemNamesSnapshot}
+          childItemNames={childItemNamesSnapshot}
+          adultLabel="You"
+        />
+      </div>
       {canEdit ? (
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
@@ -86,8 +95,9 @@ export function OrderStatusCard({
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Cancel this order?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will remove {formatOrderItems(itemNamesSnapshot)} from the kitchen queue.
+                <AlertDialogDescription className="whitespace-pre-line">
+                  This will remove {formatGuestOrder(itemNamesSnapshot, childItemNamesSnapshot)} from
+                  the kitchen queue.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -98,7 +108,7 @@ export function OrderStatusCard({
           </AlertDialog>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">Your order is already being prepared.</p>
+        <p className={cn("text-sm", config.hintClassName)}>{GUEST_STATUS_HINTS[status]}</p>
       )}
     </article>
   )

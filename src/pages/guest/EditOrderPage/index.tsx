@@ -8,11 +8,15 @@ import { OrderForm } from "@/components/guest/OrderForm"
 import type { TSelectedItemsByCategory } from "@/components/guest/OrderForm/@types"
 import { getStoredOrderToken } from "@/lib/guestStorage"
 import { toast } from "sonner"
-import { HugeiconsIcon } from "@hugeicons/react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { statusConfig, type TOrderStatus } from "@/lib/statusConfig"
-import { formatOrderItems } from "@/lib/format"
+import { GUEST_STATUS_HINTS, statusConfig, type TOrderStatus } from "@/lib/statusConfig"
+import { OrderItemsDisplay } from "@/components/OrderItemsDisplay"
+import { StatusBadge } from "@/components/StatusBadge"
+import { cn } from "@/lib/utils"
+import {
+  hasSelectedItems,
+  selectedIdsToArray,
+} from "@/lib/orderSelection"
 
 function buildSelectedIdsFromOrder(
   itemIds: Id<"menuItems">[],
@@ -43,7 +47,9 @@ export function EditOrderPage() {
   const editOrder = useMutation(api.orders.edit)
 
   const [guestName, setGuestName] = useState("")
+  const [hasChild, setHasChild] = useState(false)
   const [selectedIds, setSelectedIds] = useState<TSelectedItemsByCategory>({})
+  const [childSelectedIds, setChildSelectedIds] = useState<TSelectedItemsByCategory>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [initialized, setInitialized] = useState(false)
 
@@ -51,6 +57,9 @@ export function EditOrderPage() {
     if (order && menu && !initialized) {
       setGuestName(order.guestName)
       setSelectedIds(buildSelectedIdsFromOrder(order.itemIds, menu))
+      const childIds = order.childItemIds ?? []
+      setHasChild(childIds.length > 0)
+      setChildSelectedIds(buildSelectedIdsFromOrder(childIds, menu))
       setInitialized(true)
     }
   }, [order, menu, initialized])
@@ -59,12 +68,24 @@ export function EditOrderPage() {
     setSelectedIds((prev) => ({ ...prev, [categoryId]: itemId }))
   }
 
-  const selectedItemIds = Object.values(selectedIds).filter(
-    (id): id is Id<"menuItems"> => id !== undefined
-  )
+  function handleSelectChildItem(categoryId: Id<"menuCategories">, itemId: Id<"menuItems">) {
+    setChildSelectedIds((prev) => ({ ...prev, [categoryId]: itemId }))
+  }
+
+  const selectedItemIds = selectedIdsToArray(selectedIds)
+  const childItemIds = selectedIdsToArray(childSelectedIds)
 
   async function handleSubmit() {
-    if (!guestEditToken || selectedItemIds.length === 0) return
+    if (!guestEditToken || !menu) return
+    if (!hasSelectedItems(selectedIds)) {
+      toast.error("Select at least one item")
+      return
+    }
+    if (hasChild && !hasSelectedItems(childSelectedIds)) {
+      toast.error("Select at least one item for your child's order")
+      return
+    }
+
     setIsSubmitting(true)
     try {
       await editOrder({
@@ -72,6 +93,7 @@ export function EditOrderPage() {
         guestEditToken,
         guestName,
         itemIds: selectedItemIds,
+        childItemIds: hasChild ? childItemIds : [],
       })
       toast.success("Order updated!")
     } catch (err) {
@@ -113,21 +135,33 @@ export function EditOrderPage() {
         <Button variant="ghost" size="sm" className="mb-6 -ml-2" asChild>
           <Link to={`/t/${qrToken}`}>← Back</Link>
         </Button>
-        <div className="flex flex-col gap-4">
-          <Badge className={config.className}>
-            <HugeiconsIcon icon={config.icon} strokeWidth={2} className="size-3" />
-            {config.label}
-          </Badge>
-          <p className="text-sm text-muted-foreground">
-            Your order is already being prepared and can no longer be edited.
+        <div
+          className={cn(
+            "flex flex-col gap-4 rounded-lg border border-l-4 p-4",
+            config.surfaceClassName
+          )}
+        >
+          <StatusBadge status={order.status as TOrderStatus} />
+          <p className={cn("text-sm", config.hintClassName)}>
+            {GUEST_STATUS_HINTS[order.status as TOrderStatus]}
           </p>
-          <p className="text-sm">{formatOrderItems(order.itemNamesSnapshot)}</p>
+          <p className="text-sm text-muted-foreground">
+            This order can no longer be edited.
+          </p>
+          <OrderItemsDisplay
+            itemNames={order.itemNamesSnapshot}
+            childItemNames={order.childItemNamesSnapshot}
+            adultLabel="You"
+          />
         </div>
       </div>
     )
   }
 
-  const canSubmit = guestName.trim().length > 0 && selectedItemIds.length > 0
+  const canSubmit =
+    guestName.trim().length > 0 &&
+    hasSelectedItems(selectedIds) &&
+    (!hasChild || hasSelectedItems(childSelectedIds))
 
   return (
     <div className="mx-auto max-w-lg p-6">
@@ -139,12 +173,19 @@ export function EditOrderPage() {
         guestName={guestName}
         tableNumber={order.tableNumber}
         selectedIds={selectedIds}
+        childSelectedIds={childSelectedIds}
         categories={menu}
         isSubmitting={isSubmitting}
         canSubmit={canSubmit}
         submitLabel="Update Order"
+        hasChild={hasChild}
         onGuestNameChange={setGuestName}
+        onHasChildChange={(value) => {
+          setHasChild(value)
+          if (!value) setChildSelectedIds({})
+        }}
         onSelectItem={handleSelectItem}
+        onSelectChildItem={handleSelectChildItem}
         onSubmit={handleSubmit}
       />
     </div>

@@ -34,8 +34,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { statusConfig, isOrderAging, type TOrderStatus } from "@/lib/statusConfig"
-import { formatOrderItems, formatOrderTime } from "@/lib/format"
+import { statusConfig, isOrderAging, ORDER_STATUS_OPTIONS, type TOrderStatus } from "@/lib/statusConfig"
+import { formatGuestOrder, formatOrderTime } from "@/lib/format"
+import { OrderItemsDisplay } from "@/components/OrderItemsDisplay"
+import { StatusBadge } from "@/components/StatusBadge"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { playNewOrderDing } from "@/lib/newOrderSound"
@@ -147,19 +149,24 @@ export function OrderTable({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="preparing">Preparing</SelectItem>
-              <SelectItem value="served">Served</SelectItem>
+              {ORDER_STATUS_OPTIONS.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {statusConfig[status].label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         {activeTable && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => handleBulk("preparing")}>
-              Mark Table {activeTable.number} → Preparing
+              → Preparing
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleBulk("ready_for_pickup")}>
+              → Ready for pickup
             </Button>
             <Button variant="outline" size="sm" onClick={() => handleBulk("served")}>
-              Mark Table {activeTable.number} → Served
+              → Served
             </Button>
           </div>
         )}
@@ -190,21 +197,44 @@ export function OrderTable({
                   <TableRow
                     key={order._id}
                     className={cn(
-                      aging && "bg-accent/50",
+                      config.rowClassName,
+                      aging && "ring-1 ring-inset ring-amber-400/70",
                       isNew && "animate-in fade-in duration-500"
                     )}
                   >
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {formatOrderTime(order.createdAt)}
                     </TableCell>
-                    <TableCell className="font-medium">{order.guestName}</TableCell>
+                    <TableCell className="font-medium">
+                      <span className="inline-flex flex-wrap items-center gap-1.5">
+                        {order.guestName}
+                        {(order.childItemNamesSnapshot?.length ?? 0) > 0 && (
+                          <Badge variant="outline" className="text-[10px]">
+                            + child
+                          </Badge>
+                        )}
+                        {order.isForKid && (
+                          <Badge variant="outline" className="text-[10px]">
+                            Kid
+                          </Badge>
+                        )}
+                        {order.orderSource === "server" && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            Server
+                          </Badge>
+                        )}
+                      </span>
+                    </TableCell>
                     <TableCell>{order.tableNumber}</TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {formatOrderItems(order.itemNamesSnapshot)}
+                    <TableCell className="max-w-xs">
+                      <OrderItemsDisplay
+                        itemNames={order.itemNamesSnapshot}
+                        childItemNames={order.childItemNamesSnapshot}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Badge className={config.className}>{config.label}</Badge>
+                        <StatusBadge status={order.status as TOrderStatus} />
                         <Select
                           value={order.status}
                           onValueChange={(v) => handleStatusChange(order._id, v as TOrderStatus)}
@@ -213,9 +243,11 @@ export function OrderTable({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="preparing">Preparing</SelectItem>
-                            <SelectItem value="served">Served</SelectItem>
+                            {ORDER_STATUS_OPTIONS.map((status) => (
+                              <SelectItem key={status} value={status}>
+                                {statusConfig[status].label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -235,9 +267,13 @@ export function OrderTable({
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete order?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Remove {order.guestName}&apos;s order ({formatOrderItems(order.itemNamesSnapshot)})
-                              from the queue. This cannot be undone.
+                            <AlertDialogDescription className="whitespace-pre-line">
+                              Remove {order.guestName}&apos;s order (
+                              {formatGuestOrder(
+                                order.itemNamesSnapshot,
+                                order.childItemNamesSnapshot
+                              )}
+                              ) from the queue. This cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

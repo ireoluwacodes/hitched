@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server"
 import { v } from "convex/values"
-import { requireAdminSession } from "./lib/auth"
+import { requireRole } from "./lib/auth"
 import { generateToken } from "./lib/crypto"
 import { getEventSettings } from "./lib/settings"
 import { resolveProductName } from "./lib/branding"
@@ -29,7 +29,7 @@ export const getByToken = query({
 export const list = query({
   args: { sessionToken: v.string() },
   handler: async (ctx, { sessionToken }) => {
-    await requireAdminSession(ctx, sessionToken)
+    await requireRole(ctx, sessionToken, ["super_admin", "staff", "server"])
     const tables = await ctx.db.query("tables").collect()
     return tables.sort((a, b) => a.number - b.number)
   },
@@ -41,7 +41,7 @@ export const setCount = mutation({
     sessionToken: v.string(),
   },
   handler: async (ctx, { count, sessionToken }) => {
-    await requireAdminSession(ctx, sessionToken)
+    await requireRole(ctx, sessionToken, ["super_admin"])
 
     if (count < 1) {
       throw new Error("Table count must be at least 1")

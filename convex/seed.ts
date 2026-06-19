@@ -8,10 +8,16 @@ export default mutation({
     const existing = await getEventSettings(ctx)
     if (!existing) {
       const pinSalt = generateSalt()
-      const pinHash = await hashPin("1234", pinSalt)
+      const [superAdminPinHash, staffPinHash, serverPinHash] = await Promise.all([
+        hashPin("1234", pinSalt),
+        hashPin("5678", pinSalt),
+        hashPin("9999", pinSalt),
+      ])
       await ctx.db.insert("eventSettings", {
-        pinHash,
         pinSalt,
+        superAdminPinHash,
+        staffPinHash,
+        serverPinHash,
         eventName: "Ade & Chioma's Wedding",
         productName: "Hitched",
         orderingOpen: true,
